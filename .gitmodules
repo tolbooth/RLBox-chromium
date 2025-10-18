@@ -896,3 +896,6 @@
 	path = webkit/data/test_shell/plugins
 	url = https://chrome-internal.googlesource.com/chrome/data/webkit_plugin_tests
 	gclient-condition = checkout_src_internal
+[submodule "third_party/rlbox/src"]
+	path = third_party/rlbox/src
+	url = git@github.com:PLSysSec/rlbox.git

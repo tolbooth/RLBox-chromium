@@ -19,6 +19,7 @@ include_rules = [
     "+base/trace_event",
     "+base/win/windows_h_disallowed.h",
     "+third_party/perfetto/include/perfetto/tracing",
+    "+third_party/rlbox",
 ]
 
 specific_include_rules = {

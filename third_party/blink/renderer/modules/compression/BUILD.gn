@@ -15,4 +15,19 @@ blink_modules_sources("compression") {
     "zlib_partition_alloc.cc",
     "zlib_partition_alloc.h",
   ]
+
+  deps = [
+    "//third_party/rlbox",
+  ]
+
+  # Temporary workaround for compilation issues with RLBox. This is a big
+  # hammer.
+  if (is_clang) {
+    cflags_cc = [
+      "-Wno-shadow",
+      "-Wno-exit-time-destructors",
+      "-Wno-global-constructors",
+      "-Wno-extra-semi",
+    ]
+  }
 }

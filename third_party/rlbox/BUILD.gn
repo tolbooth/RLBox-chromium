@@ -1,0 +1,30 @@
+config("rlbox_config") {
+  include_dirs = [ "src/code/include" ]
+}
+
+config("rlbox_warnings") {
+  if (is_clang) {
+    cflags_cc = [
+      "-Wno-shadow",
+      "-Wno-exit-time-destructors",
+      "-Wno-global-constructors",
+      "-Wno-extra-semi",
+    ]
+  }
+}
+
+source_set("rlbox") {
+  public = [
+    "src/code/include/rlbox.hpp",
+    "src/code/include/rlbox_types.hpp",
+    "src/code/include/rlbox_sandbox.hpp",
+    "src/code/include/rlbox_stdlib.hpp",
+    "src/code/include/rlbox_noop_sandbox.hpp",
+    "src/code/include/rlbox_dylib_sandbox.hpp",
+  ]
+
+  configs -= ["//build/config/compiler:chromium_code" ]
+  configs += ["//build/config/compiler:no_chromium_code"]
+
+  public_configs = [ ":rlbox_config", ":rlbox_warnings" ]
+}
