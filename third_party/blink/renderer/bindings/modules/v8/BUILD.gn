@@ -29,6 +29,17 @@ blink_modules_sources("v8") {
     "//third_party/blink/renderer/platform",
     "//v8",
   ]
+
+  # Suppress RLBox-related warnings for generated bindings that include
+  # headers with RLBox (e.g., decompression_stream.h).
+  if (is_clang) {
+    cflags_cc = [
+      "-Wno-shadow",
+      "-Wno-exit-time-destructors",
+      "-Wno-global-constructors",
+      "-Wno-extra-semi",
+    ]
+  }
 }
 
 source_set("testing") {

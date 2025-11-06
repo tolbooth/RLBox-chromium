@@ -8,6 +8,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/script_value.h"
 #include "third_party/blink/renderer/core/streams/transform_stream.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
 
 namespace blink {
 
@@ -19,6 +20,7 @@ class DecompressionStream final : public ScriptWrappable {
                                      const AtomicString&,
                                      ExceptionState&);
   DecompressionStream(ScriptState*, const AtomicString&, ExceptionState&);
+  ~DecompressionStream() override;
 
   DecompressionStream(const DecompressionStream&) = delete;
   DecompressionStream& operator=(const DecompressionStream&) = delete;
@@ -30,6 +32,7 @@ class DecompressionStream final : public ScriptWrappable {
 
  private:
   Member<TransformStream> transform_;
+  std::unique_ptr<rlbox_sandbox_zlib> sandbox_;
 };
 
 }  // namespace blink
