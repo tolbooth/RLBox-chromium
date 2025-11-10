@@ -20,42 +20,86 @@
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_piece.h"
 #include "third_party/blink/renderer/modules/compression/compression_format.h"
-#include "third_party/blink/renderer/modules/compression/zlib_partition_alloc.h"
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
+#include "third_party/blink/renderer/modules/compression/zlib_structs_for_rlbox.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "v8/include/v8.h"
+
+// Load struct field definitions for sandboxed z_stream access
+rlbox_load_structs_from_library(zlib);
 
 namespace blink {
 
 DeflateTransformer::DeflateTransformer(ScriptState* script_state,
                                        CompressionFormat format,
-                                       int level)
-    : script_state_(script_state), out_buffer_(kBufferSize) {
+                                       int level,
+                                       rlbox_sandbox_zlib* sandbox)
+    : script_state_(script_state),
+      sandbox_(sandbox),
+      sandboxed_stream_(nullptr),
+      sandboxed_out_buffer_(nullptr),
+      sandboxed_in_buffer_(nullptr) {
   DCHECK(level >= 1 && level <= 9);
-  UNSAFE_TODO(memset(&stream_, 0, sizeof(z_stream)));
-  ZlibPartitionAlloc::Configure(&stream_);
+  DCHECK(sandbox_);
+
+  sandboxed_stream_ = sandbox_->malloc_in_sandbox<z_stream>();
+  sandboxed_out_buffer_ = sandbox_->malloc_in_sandbox<uint8_t>(kBufferSize);
+
+  // Set zalloc/zfree to Z_NULL to use default allocators within the sandbox
+  z_stream temp_stream = {};
+  temp_stream.zalloc = Z_NULL;
+  temp_stream.zfree = Z_NULL;
+  temp_stream.opaque = Z_NULL;
+
+  // Copy initialized stream to sandbox
+  rlbox::memcpy(*sandbox_, sandboxed_stream_, &temp_stream, sizeof(z_stream));
+
+  // Prepare version string in sandbox for deflateInit2_
+  const char* version_str = ZLIB_VERSION;
+  size_t version_len = std::strlen(version_str) + 1;
+  auto sandboxed_version = sandbox_->malloc_in_sandbox<char>(version_len);
+  rlbox::strncpy(*sandbox_, sandboxed_version, version_str, version_len);
+
+  // Compression format determines the number of window bits (base 2 of window size)
   constexpr int kWindowBits = 15;
   constexpr int kUseGzip = 16;
-  int err;
+  int window_bits;
   switch (format) {
     case CompressionFormat::kDeflate:
-      err = deflateInit2(&stream_, level, Z_DEFLATED, kWindowBits, 8,
-                         Z_DEFAULT_STRATEGY);
+      window_bits = kWindowBits;
       break;
     case CompressionFormat::kGzip:
-      err = deflateInit2(&stream_, level, Z_DEFLATED, kWindowBits + kUseGzip, 8,
-                         Z_DEFAULT_STRATEGY);
+      window_bits = kWindowBits + kUseGzip;
       break;
     case CompressionFormat::kDeflateRaw:
-      err = deflateInit2(&stream_, level, Z_DEFLATED, -kWindowBits, 8,
-                         Z_DEFAULT_STRATEGY);
+      window_bits = -kWindowBits;
       break;
   }
+
+  // Call deflateInit2_ in sandbox
+  auto result = sandbox_->invoke_sandbox_function(
+      deflateInit2_, sandboxed_stream_, level, Z_DEFLATED, window_bits, 8,
+      Z_DEFAULT_STRATEGY, sandboxed_version,
+      static_cast<int>(sizeof(z_stream)));
+  int err = result.unverified_safe_because(
+      "Error code from deflateInit2. We handle all zlib error codes safely.");
+
+  sandbox_->free_in_sandbox(sandboxed_version);
   DCHECK_EQ(Z_OK, err);
 }
 
 DeflateTransformer::~DeflateTransformer() {
-  if (!was_flush_called_) {
-    deflateEnd(&stream_);
+  if (sandboxed_stream_) {
+    if (!was_flush_called_) {
+        sandbox_->invoke_sandbox_function(deflateEnd, sandboxed_stream_);
+    }
+    sandbox_->free_in_sandbox(sandboxed_stream_);
+  }
+  if (sandboxed_out_buffer_) {
+    sandbox_->free_in_sandbox(sandboxed_out_buffer_);
+  }
+  if (sandboxed_in_buffer_) {
+    sandbox_->free_in_sandbox(sandboxed_in_buffer_);
   }
 }
 
@@ -84,8 +128,7 @@ ScriptPromise<IDLUndefined> DeflateTransformer::Flush(
     ExceptionState& exception_state) {
   Deflate(nullptr, 0u, IsFinished(true), controller, exception_state);
   was_flush_called_ = true;
-  deflateEnd(&stream_);
-  out_buffer_.clear();
+  sandbox_->invoke_sandbox_function(deflateEnd, sandboxed_stream_);
 
   return ToResolvedUndefinedPromise(script_state_.Get());
 }
@@ -96,29 +139,79 @@ void DeflateTransformer::Deflate(const uint8_t* start,
                                  TransformStreamDefaultController* controller,
                                  ExceptionState& exception_state) {
   TRACE_EVENT("blink,devtools.timeline", "CompressionStream Deflate");
-  stream_.avail_in = length;
-  // Zlib treats this pointer as const, so this cast is safe.
-  stream_.next_in = const_cast<uint8_t*>(start);
+
+  // Allocate input buffer in sandbox and copy data if needed
+  if (length > 0) {
+    // Free old buffer if it exists
+    if (sandboxed_in_buffer_) {
+      sandbox_->free_in_sandbox(sandboxed_in_buffer_);
+    }
+
+    sandboxed_in_buffer_ = sandbox_->malloc_in_sandbox<uint8_t>(length);
+    rlbox::memcpy(*sandbox_, sandboxed_in_buffer_, start, length);
+  }
+
+  // Set sandboxed stream input fields
+  sandboxed_stream_->next_in = length > 0 ? sandboxed_in_buffer_ : nullptr;
+  sandboxed_stream_->avail_in = length;
 
   // enqueue() may execute JavaScript which may invalidate the input buffer. So
   // accumulate all the output before calling enqueue().
   HeapVector<Member<DOMUint8Array>, 1u> buffers;
 
+  uInt avail_out = 0;
   do {
-    stream_.avail_out = out_buffer_.size();
-    stream_.next_out = out_buffer_.data();
-    int err = deflate(&stream_, finished ? Z_FINISH : Z_NO_FLUSH);
+    // Set sandboxed stream output fields
+    sandboxed_stream_->avail_out = kBufferSize;
+    sandboxed_stream_->next_out = sandboxed_out_buffer_;
+
+    // Call deflate() in sandbox
+    auto result = sandbox_->invoke_sandbox_function(
+        deflate, sandboxed_stream_, finished ? Z_FINISH : Z_NO_FLUSH);
+    const int err = result.unverified_safe_because(
+        "Error code from deflate. We handle all zlib error codes safely.");
     DCHECK((finished && err == Z_STREAM_END) || err == Z_OK ||
            err == Z_BUF_ERROR);
 
-    wtf_size_t bytes = out_buffer_.size() - stream_.avail_out;
-    if (bytes) {
-      buffers.push_back(
-          DOMUint8Array::Create(base::span(out_buffer_).first(bytes)));
-    }
-  } while (stream_.avail_out == 0);
+    // Verify avail_out since we use it for bounds calculations
+    avail_out = sandboxed_stream_->avail_out.copy_and_verify([](uInt val) {
+      return val <= kBufferSize ? val : kBufferSize;
+    });
 
-  DCHECK_EQ(stream_.avail_in, 0u);
+    wtf_size_t bytes = kBufferSize - avail_out;
+
+    if (bytes) {
+      // Buffer overflow protection is provided by validating avail_out before
+      // calculating bytes.
+      auto verified_buffer = sandboxed_out_buffer_.unverified_safe_pointer_because(
+          bytes,
+          "Compressed data is inherently arbitrary and cannot be validated "
+          "at this stage."
+      );
+
+      if (verified_buffer) {
+        // Create DOMUint8Array and copy from sandbox in one step
+        auto *dom_array = DOMUint8Array::Create(bytes);
+        if (dom_array) {
+          std::copy_n(verified_buffer, bytes, dom_array->Data());
+          buffers.push_back(dom_array);
+        } else {
+          exception_state.ThrowTypeError("Failed to allocate compression buffer.");
+          return;
+        }
+      } else {
+        // Sandbox returned invalid buffer, something went wrong
+        exception_state.ThrowTypeError("Internal compression error.");
+        return;
+      }
+    }
+
+  } while (avail_out == 0);
+
+  auto remaining_in = sandboxed_stream_->avail_in.copy_and_verify([length](uInt val) {
+    return val <= length ? val : 0u;
+  });
+  DCHECK_EQ(remaining_in, 0u);
 
   // JavaScript may be executed inside this loop, however it is safe because
   // |buffers| is a local variable that JavaScript cannot modify.
