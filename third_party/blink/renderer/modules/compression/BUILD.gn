@@ -28,9 +28,6 @@ blink_modules_sources("compression") {
       "-Wno-exit-time-destructors",
       "-Wno-global-constructors",
       "-Wno-extra-semi",
-      # TODO: Deprecated-copy from tainted<> copy assignment - remove when we
-      # implement struct reflection
-      "-Wno-deprecated-copy",
     ]
   }
 }
