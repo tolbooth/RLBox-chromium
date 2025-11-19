@@ -1,0 +1,6 @@
+# WASI SDK is a build-time tool only, not a compiled library.
+
+# No config or exported variables needed
+
+# Note: This assumes wasi-sdk submodule has been initialized.
+

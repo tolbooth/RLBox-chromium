@@ -1,0 +1,23 @@
+Name: Sandboxed zlib for Blink
+Short Name: zlib_sandboxed
+URL: N/A (built from //third_party/zlib)
+Version: Same as //third_party/zlib
+Date: 2025-11-18
+Update Mechanism: Manual rebuild when zlib updates
+License: Zlib (same as //third_party/zlib)
+License File: //third_party/zlib/LICENSE
+Shipped: No
+Security Critical: yes
+License Android Compatible: yes
+
+Description:
+This directory contains a sandboxed version of zlib using RLBox's wasm2c
+backend. This is part of a research project and not intended for production use.
+
+This provides a backend for the usage of RLBox to sandbox zlib usage in Blink's
+CompressionStream/DecompressionStream APIs.
+
+Usage:
+This library is used exclusively by:
+- //third_party/blink/renderer/modules/compression
+

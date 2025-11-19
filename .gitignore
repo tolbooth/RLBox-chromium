@@ -351,3 +351,9 @@ third_party/rust/target/
 
 # Trace files created when using --trace-startup.
 **/chrometrace.log
+
+# Ignore wabt/wasi-sdk binaries
+third_party/wabt/bin/
+third_party/wasi-sdk/bin/
+third_party/wasi-sdk/lib/
+third_party/wasi-sdk/share/

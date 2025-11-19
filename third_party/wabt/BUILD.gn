@@ -1,0 +1,33 @@
+# WABT (WebAssembly Binary Toolkit) integration for wasm2c tool.
+# Provides both the wasm2c transpiler tool and the wasm2c runtime library.
+
+# Since this is not designed for production use, we assume the wasm2c binary
+# has been built externally and is available instead of building from source.
+
+# Configuration for targets that need wasm2c headers
+# Must be defined before the source_set that uses it
+config("wasm2c_config") {
+  include_dirs = [ "src/wasm2c" ]
+}
+
+source_set("wasm2c_runtime") {
+  sources = [
+    "src/wasm2c/wasm-rt-impl.c",
+    "src/wasm2c/wasm-rt-impl.h",
+    "src/wasm2c/wasm-rt-mem-impl.c",
+    "src/wasm2c/wasm-rt.h",
+  ]
+
+  configs -= [ "//build/config/compiler:chromium_code" ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+
+  # Force wasm2c include paths to ALL dependents (including V8 bindings)
+  all_dependent_configs = [ ":wasm2c_config" ]
+
+  if (is_clang) {
+    cflags = [
+      "-Wno-unused-parameter",
+      "-Wno-sign-compare",
+    ]
+  }
+}

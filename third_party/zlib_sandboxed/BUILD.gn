@@ -1,0 +1,110 @@
+# Copyright 2025 tolbooth
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Sandboxed zlib using RLBox wasm2c backend.
+# This file implements the wasm2c pipeline, as described in the RLBox
+# documentation, using python scripts run as `action()` targets.
+
+_zlib_sources = [
+  "//third_party/zlib/adler32.c",
+  "//third_party/zlib/compress.c",
+  "//third_party/zlib/crc32.c",
+  "//third_party/zlib/deflate.c",
+  "//third_party/zlib/gzclose.c",
+  "//third_party/zlib/gzlib.c",
+  "//third_party/zlib/gzread.c",
+  "//third_party/zlib/gzwrite.c",
+  "//third_party/zlib/infback.c",
+  "//third_party/zlib/inffast.c",
+  "//third_party/zlib/inflate.c",
+  "//third_party/zlib/inftrees.c",
+  "//third_party/zlib/trees.c",
+  "//third_party/zlib/uncompr.c",
+  "//third_party/zlib/zutil.c",
+]
+
+action("compile_zlib_to_wasm") {
+  script = "build_wasm.py"
+  sources = _zlib_sources
+  outputs = [ "$target_gen_dir/zlib.wasm" ]
+
+  args = [
+    "--wasi-clang",
+    rebase_path("//third_party/wasi-sdk/bin/clang", root_build_dir),
+    "--sysroot",
+    rebase_path("//third_party/wasi-sdk/share/wasi-sysroot", root_build_dir),
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+    "--include-dir",
+    rebase_path("//third_party/zlib", root_build_dir),
+  ]
+  args += rebase_path(sources, root_build_dir)
+}
+
+action("transpile_wasm_to_c") {
+  script = "run_wasm2c.py"
+  sources = [ "$target_gen_dir/zlib.wasm" ]
+  outputs = [
+    "$target_gen_dir/zlib.wasm.c",
+    "$target_gen_dir/zlib.wasm.h",
+  ]
+  deps = [ ":compile_zlib_to_wasm" ]
+
+  args = [
+    "--wasm2c",
+    rebase_path("//third_party/wabt/bin/wasm2c", root_build_dir),
+    "--input",
+    rebase_path(sources[0], root_build_dir),
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+    "--module-name",
+    "zlib",
+  ]
+}
+
+source_set("zlib_wasm2c_compiled") {
+  sources = [ "$target_gen_dir/zlib.wasm.c" ]
+  public = [ "$target_gen_dir/zlib.wasm.h" ]
+
+  deps = [
+    ":transpile_wasm_to_c",
+  ]
+
+  # Use public_deps so wabt's all_dependent_configs propagate to our dependents
+  public_deps = [
+    "//third_party/rlbox_wasm2c_sandbox",
+    "//third_party/wabt:wasm2c_runtime",
+  ]
+
+  configs -= [ "//build/config/compiler:chromium_code" ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+
+  include_dirs = [
+    "$target_gen_dir",
+    "//third_party/wabt/src/wasm2c",
+  ]
+
+  if (is_clang) {
+    cflags_c = [ "-Wno-error" ]
+  }
+}
+
+config("zlib_sandboxed_config") {
+  include_dirs = [
+    "//third_party/zlib",
+    "$target_gen_dir",
+    "//third_party/wabt/src/wasm2c",
+  ]
+}
+
+source_set("zlib_sandboxed") {
+  public_deps = [
+    ":zlib_wasm2c_compiled",
+    "//third_party/rlbox",
+    "//third_party/rlbox_wasm2c_sandbox",
+  ]
+
+  # Use all_dependent_configs to force propagation to V8 bindings generator
+  all_dependent_configs = [ ":zlib_sandboxed_config" ]
+}

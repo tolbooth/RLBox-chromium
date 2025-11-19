@@ -1,0 +1,23 @@
+Name: WASI SDK
+Short Name: wasi-sdk
+URL: https://github.com/WebAssembly/wasi-sdk
+Version: wasi-sdk-27
+Date: 2025-11-19
+Update Mechanism: Git submodule
+License: Apache 2.0 with LLVM exceptions
+License File: LICENSE
+Shipped: No (build-time tool only)
+Security Critical: no
+License Android Compatible: yes
+
+Description:
+WASI SDK is a WASI-enabled WebAssembly C/C++ toolchain based on Clang/LLVM.
+It provides a complete compiler toolchain for compiling C/C++ code to
+WebAssembly with WASI (WebAssembly System Interface) support.
+
+This dependency is used at build time to compile zlib to WebAssembly as part
+of the RLBox wasm2c sandboxing integration. 
+
+This is only used during the build process to generate sandboxed code and is
+not shipped with Chromium.
+

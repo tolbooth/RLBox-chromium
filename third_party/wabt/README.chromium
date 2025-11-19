@@ -1,0 +1,21 @@
+Name: WebAssembly Binary Toolkit
+Short Name: wabt
+URL: https://github.com/WebAssembly/wabt
+Version: 1.0.36
+Date: 2025-11-19
+Update Mechanism: Git submodule
+License: Apache 2.0
+License File: LICENSE
+Shipped: No (build-time tool only)
+Security Critical: no
+License Android Compatible: yes
+
+Description:
+The WebAssembly Binary Toolkit (WABT) is a suite of tools for working with
+WebAssembly. This integration specifically uses the wasm2c tool, which
+transpiles WebAssembly modules into C code.
+
+This is only used during the build process to generate sandboxed code and is
+not shipped with Chromium. The wasm2c runtime sources are compiled into the
+sandboxed library.
+
