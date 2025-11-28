@@ -7,6 +7,7 @@
 
 #include "third_party/blink/renderer/bindings/core/v8/script_value.h"
 #include "third_party/blink/renderer/core/streams/transform_stream.h"
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 
 namespace blink {
@@ -23,6 +24,8 @@ class CompressionStream final : public ScriptWrappable {
   CompressionStream(const CompressionStream&) = delete;
   CompressionStream& operator=(const CompressionStream&) = delete;
 
+  ~CompressionStream() override;
+
   ReadableStream* readable() const;
   WritableStream* writable() const;
 
@@ -30,6 +33,8 @@ class CompressionStream final : public ScriptWrappable {
 
  private:
   Member<TransformStream> transform_;
+
+  std::unique_ptr<rlbox_sandbox_zlib> sandbox_;
 
   // TODO(crbug.com/427166012): Remove this when the crashes in this class have
   // been diagnosed.

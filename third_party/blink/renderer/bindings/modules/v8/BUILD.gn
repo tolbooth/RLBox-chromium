@@ -29,6 +29,21 @@ blink_modules_sources("v8") {
     "//third_party/blink/renderer/platform",
     "//v8",
   ]
+
+  # V8 bindings need zlib_sandboxed configs to compile generated code that
+  # includes compression module headers (compression_stream.h, decompression_stream.h).
+  # Using public_deps ensures all_dependent_configs propagate (wasm-rt.h paths, etc.)
+  public_deps = [ "//third_party/zlib_sandboxed" ]
+
+  # Suppress RLBox-related warnings for generated bindings
+  if (is_clang) {
+    cflags_cc = [
+      "-Wno-shadow",
+      "-Wno-exit-time-destructors",
+      "-Wno-global-constructors",
+      "-Wno-extra-semi",
+    ]
+  }
 }
 
 source_set("testing") {

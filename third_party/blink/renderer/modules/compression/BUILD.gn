@@ -12,7 +12,24 @@ blink_modules_sources("compression") {
     "deflate_transformer.h",
     "inflate_transformer.cc",
     "inflate_transformer.h",
-    "zlib_partition_alloc.cc",
-    "zlib_partition_alloc.h",
   ]
+
+  deps = [
+    "//third_party/zlib_sandboxed",
+  ]
+
+  defines = [
+    # Disable symbol prefixing when accessing sandboxed zlib (interferes with
+    # wasm2c sandbox symbol lookup)
+    "THIRD_PARTY_ZLIB_CHROMECONF_H_",
+  ]
+
+  if (is_clang) {
+    cflags_cc = [
+      "-Wno-shadow",
+      "-Wno-exit-time-destructors",
+      "-Wno-global-constructors",
+      "-Wno-extra-semi",
+    ]
+  }
 }

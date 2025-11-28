@@ -896,3 +896,12 @@
 	path = webkit/data/test_shell/plugins
 	url = https://chrome-internal.googlesource.com/chrome/data/webkit_plugin_tests
 	gclient-condition = checkout_src_internal
+[submodule "third_party/rlbox/src"]
+	path = third_party/rlbox/src
+	url = git@github.com:tolbooth/rlbox.git
+[submodule "third_party/wabt/src"]
+	path = third_party/wabt/src
+	url = https://github.com/WebAssembly/wabt.git
+[submodule "third_party/rlbox_wasm2c_sandbox/src"]
+	path = third_party/rlbox_wasm2c_sandbox/src
+	url = git@github.com:tolbooth/rlbox_wasm2c_sandbox.git

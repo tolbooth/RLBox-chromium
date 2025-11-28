@@ -9,6 +9,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/capture_source_location.h"
 #include "third_party/blink/renderer/modules/compression/compression_format.h"
 #include "third_party/blink/renderer/modules/compression/deflate_transformer.h"
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "v8/include/v8-sandbox.h"
 
@@ -19,6 +20,12 @@ CompressionStream* CompressionStream::Create(ScriptState* script_state,
                                              ExceptionState& exception_state) {
   return MakeGarbageCollected<CompressionStream>(script_state, format,
                                                  exception_state);
+}
+
+CompressionStream::~CompressionStream() {
+  if (sandbox_) {
+    sandbox_->destroy_sandbox();
+  }
 }
 
 ReadableStream* CompressionStream::readable() const {
@@ -52,13 +59,19 @@ CompressionStream::CompressionStream(ScriptState* script_state,
   UMA_HISTOGRAM_ENUMERATION("Blink.Compression.CompressionStream.Format",
                             deflate_format);
 
+  // Create and initialize the RLBox sandbox for zlib deflate operations
+  sandbox_ = std::make_unique<rlbox_sandbox_zlib>();
+  bool sandbox_created = sandbox_->create_sandbox();
+  DCHECK(sandbox_created);
+
   // default level is hardcoded for now.
   // TODO(arenevier): Make level configurable
   const int deflate_level = 6;
   transform_ =
       TransformStream::Create(script_state,
                               MakeGarbageCollected<DeflateTransformer>(
-                                  script_state, deflate_format, deflate_level),
+                                  script_state, deflate_format, deflate_level,
+                                  sandbox_.get()),
                               exception_state);
   CHECK(transform_);
   initialized_ = true;

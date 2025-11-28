@@ -7,6 +7,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "third_party/blink/renderer/modules/compression/compression_format.h"
 #include "third_party/blink/renderer/modules/compression/inflate_transformer.h"
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 
 namespace blink {
@@ -43,10 +44,21 @@ DecompressionStream::DecompressionStream(ScriptState* script_state,
   UMA_HISTOGRAM_ENUMERATION("Blink.Compression.DecompressionStream.Format",
                             inflate_format);
 
+  sandbox_ = std::make_unique<rlbox_sandbox_zlib>();
+  bool sandbox_created = sandbox_->create_sandbox();
+  DCHECK(sandbox_created);
+
   transform_ = TransformStream::Create(
       script_state,
-      MakeGarbageCollected<InflateTransformer>(script_state, inflate_format),
+      MakeGarbageCollected<InflateTransformer>(script_state, inflate_format,
+                                               sandbox_.get()),
       exception_state);
+}
+
+DecompressionStream::~DecompressionStream() {
+  if (sandbox_) {
+    sandbox_->destroy_sandbox();
+  }
 }
 
 }  // namespace blink

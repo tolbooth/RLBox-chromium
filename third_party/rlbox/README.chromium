@@ -1,0 +1,21 @@
+Name: RLBox
+URL: https://github.com/PLSysSec/rlbox
+Version: N/A
+Date: 2025-10-17
+Update Mechanism: Manual
+License: MIT
+License File: ./src/LICENSE
+Shipped: Yes
+Security Critical: yes
+License Android Compatible: yes
+
+Description:
+WIP. This is not any official addition. This is simply added for an experimental
+fork.
+
+RLBox is a general purpose sandboxing API that can be used to interact with
+library sandboxed with different backends --- WebAssembly, Native Client, OS
+processess, etc.
+
+Local Modifications:
+None

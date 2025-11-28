@@ -1,0 +1,48 @@
+# Copyright 2025 tolbooth
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# RLBox wasm2c sandbox backend.
+# Provides the C++ wrapper that integrates wasm2c-compiled code with RLBox.
+
+config("rlbox_wasm2c_config") {
+  include_dirs = [
+    # Path to rlbox_wasm2c_sandbox headers
+    "src/include",
+  ]
+}
+
+source_set("rlbox_wasm2c_sandbox") {
+  sources = [
+    "src/src/wasm2c_rt_mem.c",
+    "src/src/wasm2c_rt_minwasi.c",
+  ]
+
+  public = [
+    "src/include/rlbox_wasm2c_sandbox.hpp",
+    "src/include/rlbox_wasm2c_tls.hpp",
+    "src/include/wasm2c_rt_mem.h",
+    "src/include/wasm2c_rt_minwasi.h",
+  ]
+
+  configs -= [ "//build/config/compiler:chromium_code" ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+
+  # Force config through to all dependents 
+  all_dependent_configs = [ ":rlbox_wasm2c_config" ]
+
+  public_deps = [
+    "//third_party/rlbox",
+
+    # wasm2c runtime (provides wasm-rt.h and wasm-rt-impl.c)
+    # This will also propagate wabt's include paths via all_dependent_configs
+    "//third_party/wabt:wasm2c_runtime",
+  ]
+
+  if (is_clang) {
+    cflags = [
+      "-Wno-unused-parameter",
+      "-Wno-sign-compare",
+    ]
+  }
+}

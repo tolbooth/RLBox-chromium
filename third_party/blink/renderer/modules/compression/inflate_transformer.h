@@ -5,12 +5,18 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_COMPRESSION_INFLATE_TRANSFORMER_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_COMPRESSION_INFLATE_TRANSFORMER_H_
 
+#include "base/memory/raw_ptr.h"
 #include "base/types/strong_alias.h"
 #include "third_party/blink/renderer/core/streams/transform_stream_transformer.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_typed_array.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
+
+// Include zlib before RLBox
 #include "third_party/zlib/zlib.h"
+
+// Include RLBox types configuration
+#include "third_party/blink/renderer/modules/compression/zlib_rlbox_types.h"
 
 namespace blink {
 
@@ -18,7 +24,9 @@ enum class CompressionFormat;
 
 class InflateTransformer final : public TransformStreamTransformer {
  public:
-  InflateTransformer(ScriptState*, CompressionFormat);
+  InflateTransformer(ScriptState*,
+                     CompressionFormat,
+                     rlbox_sandbox_zlib*);
 
   InflateTransformer(const InflateTransformer&) = delete;
   InflateTransformer& operator=(const InflateTransformer&) = delete;
@@ -51,9 +59,17 @@ class InflateTransformer final : public TransformStreamTransformer {
 
   Member<ScriptState> script_state_;
 
-  z_stream stream_;
+  // Non-owning pointer to the sandbox owned by DecompressionStream
+  raw_ptr<rlbox_sandbox_zlib> sandbox_;
 
-  Vector<uint8_t> out_buffer_;
+  // z_stream allocated in sandbox memory
+  tainted_zlib<z_stream*> sandboxed_stream_;
+
+  // Output buffer in sandbox memory
+  tainted_zlib<uint8_t*> sandboxed_out_buffer_;
+
+  // Input buffer in sandbox memory (allocated per chunk)
+  tainted_zlib<uint8_t*> sandboxed_in_buffer_;
 
   bool was_flush_called_ = false;
   bool reached_end_ = false;
